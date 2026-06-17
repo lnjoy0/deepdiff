@@ -115,67 +115,6 @@ def _path_to_elements(path, root_element=DEFAULT_FIRST_ELEMENT):
     return tuple(elements)
 
 
-def _get_nested_obj(obj, elements, next_element=None):
-    for (elem, action) in elements:
-        check_elem(elem)
-        if action == GET:
-            obj = obj[elem]
-        elif action == GETATTR:
-            obj = getattr(obj, elem)
-    return obj
-
-
-def _guess_type(elements, elem, index, next_element):
-    # If we are not at the last elements
-    if index < len(elements) - 1:
-        # We assume it is a nested dictionary not a nested list
-        return {}
-    if isinstance(next_element, int):
-        return []
-    return {}
-
-
-def check_elem(elem):
-    if isinstance(elem, str) and elem.startswith("__") and elem.endswith("__"):
-        raise ValueError("traversing dunder attributes is not allowed")
-
-
-def _get_nested_obj_and_force(obj, elements, next_element=None):
-    prev_elem = None
-    prev_action = None
-    prev_obj = obj
-    for index, (elem, action) in enumerate(elements):
-        check_elem(elem)
-        _prev_obj = obj
-        if action == GET:
-            try:
-                obj = obj[elem]
-                prev_obj = _prev_obj
-            except KeyError:
-                obj[elem] = _guess_type(elements, elem, index, next_element)
-                obj = obj[elem]
-                prev_obj = _prev_obj
-            except IndexError:
-                if isinstance(obj, list) and isinstance(elem, int) and elem >= len(obj):
-                    obj.extend([None] * (elem - len(obj)))
-                    obj.append(_guess_type(elements, elem, index), next_element)
-                    obj = obj[-1]
-                    prev_obj = _prev_obj
-                elif isinstance(obj, list) and len(obj) == 0 and prev_elem:
-                    # We ran into an empty list that should have been a dictionary
-                    # We need to change it from an empty list to a dictionary
-                    obj = {elem: _guess_type(elements, elem, index, next_element)}
-                    if prev_action == GET:
-                        prev_obj[prev_elem] = obj
-                    else:
-                        setattr(prev_obj, prev_elem, obj)
-                    obj = obj[elem]
-        elif action == GETATTR:
-            obj = getattr(obj, elem)
-            prev_obj = _prev_obj
-        prev_elem = elem
-        prev_action = action
-    return obj
 
 
 def extract(obj, path):
