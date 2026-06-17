@@ -17,7 +17,7 @@ from deepdiff.helper import (
 )
 from deepdiff.path import (
     _path_to_elements, _get_nested_obj, _get_nested_obj_and_force,
-    GET, GETATTR, check_elem, parse_path, stringify_path,
+    GET, GETATTR, parse_path, stringify_path,
 )
 from deepdiff.anyset import AnySet
 from deepdiff.summarize import summarize
@@ -227,6 +227,55 @@ class Delta:
             self._raise_or_log(VERIFICATION_MSG.format(
                 path_str, expected_old_value, current_old_value, VERIFY_BIDIRECTIONAL_MSG))
 
+    def _get_elem_and_compare_to_old_value(
+        self,
+        obj,
+        path_for_err_reporting,
+        expected_old_value,
+        elem=None,
+        action=None,
+        forced_old_value=None,
+        next_element=None,
+    ):
+        # if forced_old_value is not None:
+        try:
+            if action == GET:
+                current_old_value = obj[elem]
+            elif action == GETATTR:
+                current_old_value = getattr(obj, elem)  # type: ignore
+            else:
+                raise DeltaError(INVALID_ACTION_WHEN_CALLING_GET_ELEM.format(action))
+        except (KeyError, IndexError, AttributeError, TypeError) as e:
+            if self.force:
+                if forced_old_value is None:
+                    if next_element is None or isinstance(next_element, str):
+                        _forced_old_value = {}
+                    else:
+                        _forced_old_value = []    
+                else:
+                    _forced_old_value = forced_old_value
+                if action == GET:
+                    if isinstance(obj, list):
+                        if isinstance(elem, int) and elem < len(obj):
+                            obj[elem] = _forced_old_value
+                        else:
+                            obj.append(_forced_old_value)
+                    else:
+                        obj[elem] = _forced_old_value
+                elif action == GETATTR:
+                    setattr(obj, elem, _forced_old_value)  # type: ignore
+                return _forced_old_value
+            current_old_value = not_found
+            if isinstance(path_for_err_reporting, (list, tuple)):
+                path_for_err_reporting = '.'.join([i[0] for i in path_for_err_reporting])
+            if self.bidirectional:
+                self._raise_or_log(VERIFICATION_MSG.format(
+                    path_for_err_reporting,
+                    expected_old_value, current_old_value, e))
+            else:
+                self._raise_or_log(UNABLE_TO_GET_PATH_MSG.format(
+                    path_for_err_reporting))
+        return current_old_value
 
     def _simple_set_elem_value(self, obj, path_for_err_reporting, elem=None, value=None, action=None):
         """
@@ -463,6 +512,37 @@ class Delta:
             if preprocess_paths:
                 self._do_values_or_type_changed(preprocess_paths, is_type_change=True)
 
+    def _get_elements_and_details(self, path):
+        try:
+            elements = _path_to_elements(path)
+            if len(elements) > 1:
+                elements_subset = elements[:-2]
+                if len(elements_subset) != len(elements):
+                    next_element = elements[-2][0]
+                    next2_element = elements[-1][0]
+                else:
+                    next_element = None
+                parent = self.get_nested_obj(obj=self, elements=elements_subset, next_element=next_element)
+                parent_to_obj_elem, parent_to_obj_action = elements[-2]
+                obj = self._get_elem_and_compare_to_old_value(
+                    obj=parent, path_for_err_reporting=path, expected_old_value=None,
+                    elem=parent_to_obj_elem, action=parent_to_obj_action, next_element=next2_element)  # type: ignore
+            else:
+                # parent = self
+                # obj = self.root
+                # parent_to_obj_elem = 'root'
+                # parent_to_obj_action = GETATTR
+                parent = parent_to_obj_elem = parent_to_obj_action = None
+                obj = self
+                # obj = self.get_nested_obj(obj=self, elements=elements[:-1])
+            elem, action = elements[-1]  # type: ignore
+        except Exception as e:
+            self._raise_or_log(UNABLE_TO_GET_ITEM_MSG.format(path, e))
+            return None
+        else:
+            if obj is not_found:
+                return None
+            return elements, parent, parent_to_obj_elem, parent_to_obj_action, obj, elem, action
 
     def _do_values_or_type_changed(self, changes, is_type_change=False, verify_changes=True):
         for path, value in changes.items():

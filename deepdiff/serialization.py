@@ -59,6 +59,43 @@ FORBIDDEN_MODULE_MSG = "Module '{}' is forbidden. You need to explicitly pass it
 DELTA_IGNORE_ORDER_NEEDS_REPETITION_REPORT = 'report_repetition must be set to True when ignore_order is True to create the delta object.'
 DELTA_ERROR_WHEN_GROUP_BY = 'Delta can not be made when group_by is used since the structure of data is modified from the original form.'
 
+SAFE_TO_IMPORT = {
+    'builtins.range',
+    'builtins.complex',
+    'builtins.set',
+    'builtins.frozenset',
+    'builtins.slice',
+    'builtins.str',
+    'builtins.bytes',
+    'builtins.list',
+    'builtins.tuple',
+    'builtins.int',
+    'builtins.float',
+    'builtins.dict',
+    'builtins.bool',
+    'builtins.bin',
+    'builtins.None',
+    'datetime.datetime',
+    'datetime.time',
+    'datetime.timedelta',
+    'decimal.Decimal',
+    'uuid.UUID',
+    'orderly_set.sets.OrderedSet',
+    'orderly_set.sets.OrderlySet',
+    'orderly_set.sets.StableSetEq',
+    'deepdiff.helper.SetOrdered',
+    'collections.namedtuple',
+    'collections.OrderedDict',
+    're.Pattern',
+    'deepdiff.helper.Opcode',
+    'ipaddress.IPv4Interface',
+    'ipaddress.IPv6Interface',
+    'ipaddress.IPv4Network',
+    'ipaddress.IPv6Network',
+    'ipaddress.IPv4Address',
+    'ipaddress.IPv6Address',
+    'collections.abc.KeysView',
+}
 
 
 TYPE_STR_TO_TYPE = {
